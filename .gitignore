@@ -1,0 +1,13 @@
+.idea/
+.vscode/
+*.iml
+
+target/
+dist/
+node_modules/
+.hbuilderx/
+unpackage/
+
+.env
+*.log
+logs/
