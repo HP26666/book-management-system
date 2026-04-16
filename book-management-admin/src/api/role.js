@@ -1,0 +1,7 @@
+import request from '@/utils/request'
+
+export const getRoleList = () => request.get('/roles')
+export const getRoleById = id => request.get(`/roles/${id}`)
+export const createRole = data => request.post('/roles', data)
+export const updateRole = (id, data) => request.put(`/roles/${id}`, data)
+export const deleteRole = id => request.delete(`/roles/${id}`)

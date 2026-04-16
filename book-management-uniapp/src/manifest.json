@@ -7,9 +7,28 @@
   "mp-weixin": {
     "appid": "",
     "setting": {
-      "urlCheck": true
+      "urlCheck": false,
+      "es6": true,
+      "postcss": true,
+      "minified": true
     },
-    "usingComponents": true
+    "usingComponents": true,
+    "permission": {
+      "scope.userLocation": {
+        "desc": "用于定位附近图书馆"
+      }
+    }
+  },
+  "h5": {
+    "devServer": {
+      "proxy": {
+        "/api": {
+          "target": "http://localhost:8080",
+          "changeOrigin": true
+        }
+      }
+    },
+    "title": "图书管理系统"
   },
   "vueVersion": "3"
 }

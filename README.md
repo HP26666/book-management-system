@@ -20,14 +20,33 @@ book_management_system/
 │   ├── Dockerfile
 │   ├── pom.xml
 │   └── src/main/
+│       ├── java/com/bookms/       # controller / service / repository / entity / dto / security 等
+│       └── resources/
+│           ├── application.yml
+│           └── db/migration/      # Flyway 迁移脚本
 ├── book-management-admin/          # Vue 3 管理端
 │   ├── Dockerfile
 │   ├── nginx.conf
 │   ├── package.json
 │   └── src/
+│       ├── api/                   # 按模块封装的 Axios 接口
+│       ├── layout/                # 后台布局组件
+│       ├── router/                # Vue Router 配置
+│       ├── stores/                # Pinia 状态管理
+│       ├── utils/                 # 请求封装、工具函数
+│       ├── views/                 # 页面视图（登录、Dashboard、图书、借阅等）
+│       ├── styles/
+│       ├── App.vue
+│       └── main.js
 ├── book-management-uniapp/         # Uni-App 小程序端，不纳入 Docker 运行
 │   ├── package.json
 │   └── src/
+│       ├── api/                   # 接口封装
+│       ├── pages/                 # 页面（首页、搜索、详情、借阅、预约、个人中心）
+│       ├── stores/                # Pinia 状态管理
+│       ├── utils/                 # 请求封装
+│       ├── App.vue
+│       └── main.js
 ├── .env.example                    # Docker Compose 环境变量模板
 ├── docker-compose.yml              # 本地/测试环境编排
 └── README.md
@@ -51,8 +70,9 @@ docker compose up -d --build
 
 默认访问地址：
 
-- 管理端：`http://localhost`
-- 后端健康检查：`http://localhost:8080/actuator/health`
+- 管理端：`http://localhost:16666`
+- 后端 Swagger/OpenAPI：`http://localhost:8080/api/swagger-ui/index.html`
+- 后端健康检查：`http://localhost:8080/api/actuator/health`
 - PostgreSQL：`localhost:5432`
 - Redis：`localhost:6379`
 
@@ -83,19 +103,21 @@ npm run dev:mp-weixin
 
 也可以使用 HBuilderX 导入 `book-management-uniapp`，配置微信小程序 `appid` 后运行到微信开发者工具。
 
-## 文档阅读顺序
+## 文档目录
 
-| 顺序 | 文档 | 用途 |
+| 文档 | 读者 | 用途 |
 |------|------|------|
-| 01 | `docs/01-需求规格说明书.md` | 明确业务边界、角色、功能和非功能要求 |
-| 02 | `docs/02-概要设计说明书.md` | 明确总体架构、模块边界和运行环境 |
-| 03 | `docs/03-详细设计说明书.md` | 指导后端、管理端、小程序端的代码结构和流程实现 |
-| 04 | `docs/04-数据库设计说明书.md` | 指导 PostgreSQL 表结构、索引、枚举和迁移脚本 |
-| 05 | `docs/05-接口设计文档.md` | 指导前后端 API 契约、鉴权和错误码 |
-| 06 | `docs/06-测试计划.md` | 指导单元、接口、集成、性能、安全测试 |
-| 07 | `docs/07-部署运维手册.md` | 指导 Docker 部署、环境变量、日志、备份与排障 |
-| 08 | `docs/08-用户操作手册.md` | 指导最终用户操作和功能验收体验 |
-| 09 | `docs/09-项目验收目标文档.md` | 作为开发完成后的验收清单和通过标准 |
+| [`docs/README.md`](./docs/README.md) | 全员 | 文档导航与快速入口 |
+| [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) | 开发 / 运维 | 系统架构、模块边界、部署拓扑 |
+| [`docs/DEVELOPMENT.md`](./docs/DEVELOPMENT.md) | 开发 | 本地环境搭建、构建、测试、调试 |
+| [`docs/API.md`](./docs/API.md) | 前端 / 测试 / 运维 | 接口规范、认证方式、接口速查 |
+| [`docs/DATABASE.md`](./docs/DATABASE.md) | 后端 / DBA | 数据库设计、Flyway 迁移规则 |
+| [`docs/DEPLOYMENT.md`](./docs/DEPLOYMENT.md) | 运维 / 开发 | Docker 部署、备份、排障 |
+| [`docs/USER_GUIDE.md`](./docs/USER_GUIDE.md) | 最终用户 | PC 管理端与小程序操作说明 |
+| [`docs/CHANGELOG.md`](./docs/CHANGELOG.md) | 全员 | 版本变更记录、已知问题 |
+| [`docs/archive/`](./docs/archive/) | 全员 | 前期规划文档（01-09）归档 |
+
+> 前期规划文档（需求规格、概要设计、详细设计、验收目标等）已归档至 `docs/archive/`。
 
 ## 后续 Agent 开发约束
 
