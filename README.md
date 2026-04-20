@@ -49,9 +49,16 @@ cp .env.example .env
 docker compose up -d --build
 ```
 
+> 如果宿主机 80/8080 端口被占用，可通过环境变量指定端口：
+> ```bash
+> ADMIN_PORT=3000 BACKEND_PORT=18080 docker compose up -d --build
+> ```
+
 默认访问地址：
 
-- 管理端：`http://localhost`
+- 管理端：`http://localhost`（如端口冲突改为 `$ADMIN_PORT`）
+- 后端 API：`http://localhost:8080/api`（如端口冲突改为 `$BACKEND_PORT`）
+- Swagger UI：`http://localhost:8080/swagger-ui/index.html`
 - 后端健康检查：`http://localhost:8080/actuator/health`
 - PostgreSQL：`localhost:5432`
 - Redis：`localhost:6379`
@@ -82,6 +89,19 @@ npm run dev:mp-weixin
 ```
 
 也可以使用 HBuilderX 导入 `book-management-uniapp`，配置微信小程序 `appid` 后运行到微信开发者工具。
+
+本地联调说明：
+
+- 小程序登录页支持开发环境 Mock 登录，可直接输入任意 `code` 完成登录。
+- 小程序个人中心支持修改接口地址，默认连接 `http://127.0.0.1:8080/api`。
+- 微信开发者工具本地调试已关闭 `urlCheck`，便于连接本地后端；正式发布前应恢复为平台要求的合法域名配置。
+
+### 4. 默认测试账号
+
+- 管理员：`admin / admin123`
+- 图书管理员：`librarian1 / Test1234`
+- 读者：`reader1 / Test1234`
+- 读者：`reader2 / Test1234`
 
 ## 文档阅读顺序
 

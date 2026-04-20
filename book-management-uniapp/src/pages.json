@@ -1,12 +1,59 @@
 {
   "pages": [
     {
+      "path": "pages/login/index",
+      "style": {
+        "navigationBarTitleText": "微信登录",
+        "navigationBarBackgroundColor": "#0f766e",
+        "navigationBarTextStyle": "white"
+      }
+    },
+    {
       "path": "pages/index/index",
       "style": {
-        "navigationBarTitleText": "图书管理系统",
+        "navigationBarTitleText": "首页",
         "navigationBarBackgroundColor": "#0f766e",
-        "navigationBarTextStyle": "white",
-        "navigationStyle": "custom"
+        "navigationBarTextStyle": "white"
+      }
+    },
+    {
+      "path": "pages/search/index",
+      "style": {
+        "navigationBarTitleText": "图书搜索",
+        "navigationBarBackgroundColor": "#0f766e",
+        "navigationBarTextStyle": "white"
+      }
+    },
+    {
+      "path": "pages/book-detail/index",
+      "style": {
+        "navigationBarTitleText": "图书详情",
+        "navigationBarBackgroundColor": "#0f766e",
+        "navigationBarTextStyle": "white"
+      }
+    },
+    {
+      "path": "pages/borrow/index",
+      "style": {
+        "navigationBarTitleText": "我的借阅",
+        "navigationBarBackgroundColor": "#0f766e",
+        "navigationBarTextStyle": "white"
+      }
+    },
+    {
+      "path": "pages/reservation/index",
+      "style": {
+        "navigationBarTitleText": "我的预约",
+        "navigationBarBackgroundColor": "#0f766e",
+        "navigationBarTextStyle": "white"
+      }
+    },
+    {
+      "path": "pages/notices/index",
+      "style": {
+        "navigationBarTitleText": "公告通知",
+        "navigationBarBackgroundColor": "#0f766e",
+        "navigationBarTextStyle": "white"
       }
     },
     {
@@ -14,8 +61,7 @@
       "style": {
         "navigationBarTitleText": "我的",
         "navigationBarBackgroundColor": "#0f766e",
-        "navigationBarTextStyle": "white",
-        "navigationStyle": "custom"
+        "navigationBarTextStyle": "white"
       }
     }
   ],

@@ -1,115 +1,112 @@
 <template>
-  <div class="dashboard">
-    <!-- Page title -->
+  <div class="dashboard" v-loading="loading">
     <div class="dashboard__heading">
       <h2 class="dashboard__title">仪表板</h2>
-      <p class="dashboard__subtitle">欢迎回来，管理员 👋</p>
+      <p class="dashboard__subtitle">{{ subtitle }}</p>
     </div>
 
-    <!-- Stat cards -->
-    <section aria-label="统计数据" class="stat-grid">
-      <el-card
-        v-for="stat in stats"
-        :key="stat.label"
-        class="stat-card"
-        :body-style="{ padding: '0' }"
-      >
+    <section class="stat-grid" aria-label="统计概览">
+      <el-card v-for="stat in statCards" :key="stat.label" class="stat-card" :body-style="{ padding: '0' }">
         <div class="stat-card__inner">
           <div class="stat-card__icon" :style="{ background: stat.iconBg }">
-            <el-icon :size="24" :color="stat.iconColor" aria-hidden="true">
-              <component :is="stat.icon" />
-            </el-icon>
+            <el-icon :size="24" :color="stat.iconColor"><component :is="stat.icon" /></el-icon>
           </div>
           <div class="stat-card__body">
             <p class="stat-card__label">{{ stat.label }}</p>
             <p class="stat-card__value">{{ stat.value }}</p>
           </div>
-          <el-tag
-            :type="stat.trend > 0 ? 'success' : 'danger'"
-            size="small"
-            round
-            class="stat-card__trend"
-            :aria-label="`较上月${stat.trend > 0 ? '增加' : '减少'} ${Math.abs(stat.trend)}%`"
-          >
-            {{ stat.trend > 0 ? '↑' : '↓' }} {{ Math.abs(stat.trend) }}%
-          </el-tag>
         </div>
       </el-card>
     </section>
 
-    <!-- Recent activity + quick links -->
     <div class="dashboard__grid">
-      <!-- Recent borrows table -->
-      <el-card class="dashboard__card" aria-label="近期借阅">
+      <el-card class="dashboard__card">
         <template #header>
           <div class="card-header">
-            <h3 class="card-header__title">近期借阅</h3>
-            <el-button link type="primary" size="small">查看全部</el-button>
+            <h3 class="card-header__title">{{ primaryTableTitle }}</h3>
+            <RouterLink :to="primaryTableLink" class="card-header__link">查看全部</RouterLink>
           </div>
         </template>
 
-        <el-table
-          :data="recentBorrows"
-          style="width: 100%"
-          aria-label="近期借阅记录"
-          stripe
-        >
-          <el-table-column prop="title" label="书名" min-width="140" show-overflow-tooltip />
-          <el-table-column prop="reader" label="读者" width="100" />
-          <el-table-column prop="date" label="借阅日期" width="110" />
-          <el-table-column prop="due" label="应还日期" width="110" />
-          <el-table-column label="状态" width="90" align="center">
+        <el-table :data="primaryTableData" stripe style="width: 100%">
+          <el-table-column prop="bookTitle" label="书名" min-width="180" show-overflow-tooltip />
+          <el-table-column v-if="userStore.isManager" prop="realName" label="读者" width="120" />
+          <el-table-column :prop="userStore.isManager ? 'borrowDate' : 'dueDate'" :label="userStore.isManager ? '借阅日期' : '应还日期'" width="130">
             <template #default="{ row }">
-              <el-tag
-                :type="row.status === '借阅中' ? 'primary' : row.status === '已逾期' ? 'danger' : 'success'"
-                size="small"
-                round
-              >
-                {{ row.status }}
+              {{ formatDate(userStore.isManager ? row.borrowDate : row.dueDate) }}
+            </template>
+          </el-table-column>
+          <el-table-column label="状态" width="100" align="center">
+            <template #default="{ row }">
+              <el-tag :type="findOptionTag(BORROW_STATUS_OPTIONS, row.status)" round>
+                {{ findOptionLabel(BORROW_STATUS_OPTIONS, row.status) }}
               </el-tag>
             </template>
           </el-table-column>
         </el-table>
       </el-card>
 
-      <!-- Quick links -->
-      <el-card class="dashboard__card dashboard__card--narrow" aria-label="快速入口">
+      <el-card class="dashboard__card dashboard__card--narrow">
         <template #header>
           <h3 class="card-header__title">快速入口</h3>
         </template>
 
         <div class="quick-links">
-          <RouterLink
-            v-for="link in quickLinks"
-            :key="link.label"
-            :to="link.to"
-            class="quick-link"
-          >
+          <RouterLink v-for="link in quickLinks" :key="link.label" :to="link.to" class="quick-link">
             <div class="quick-link__icon" :style="{ background: link.bg }">
-              <el-icon :size="20" :color="link.color" aria-hidden="true">
-                <component :is="link.icon" />
-              </el-icon>
+              <el-icon :size="18" :color="link.color"><component :is="link.icon" /></el-icon>
             </div>
             <span class="quick-link__label">{{ link.label }}</span>
-            <el-icon class="quick-link__arrow" aria-hidden="true"><ArrowRight /></el-icon>
+            <el-icon class="quick-link__arrow"><ArrowRight /></el-icon>
           </RouterLink>
         </div>
 
         <el-divider />
 
-        <!-- System status -->
-        <div class="system-status" role="status" aria-label="系统状态">
+        <div v-if="userStore.isManager" class="system-status">
           <p class="system-status__heading">系统状态</p>
-          <div
-            v-for="svc in services"
-            :key="svc.name"
-            class="system-status__row"
-          >
-            <span class="system-status__dot" :class="`system-status__dot--${svc.status}`" aria-hidden="true" />
-            <span class="system-status__name">{{ svc.name }}</span>
-            <span class="system-status__badge" :class="`system-status__badge--${svc.status}`">
-              {{ svc.statusText }}
-            </span>
+          <div v-for="item in systemStatus" :key="item.name" class="system-status__row">
+            <span class="system-status__dot" :class="`system-status__dot--${item.status}`" />
+            <span class="system-status__name">{{ item.name }}</span>
+            <span class="system-status__badge" :class="`system-status__badge--${item.status}`">{{ item.label }}</span>
+          </div>
+        </div>
+
+        <div v-else class="notice-list">
+          <p class="system-status__heading">最新公告</p>
+          <div v-for="notice in latestNotices" :key="notice.id" class="notice-item">
+            <p class="notice-item__title">{{ notice.title }}</p>
+            <p class="notice-item__meta">{{ formatDateTime(notice.publishTime) }}</p>
+          </div>
+        </div>
+      </el-card>
+    </div>
+
+    <div v-if="userStore.isManager" class="dashboard__grid dashboard__grid--bottom">
+      <el-card class="dashboard__card">
+        <template #header>
+          <h3 class="card-header__title">热门图书 Top 10</h3>
+        </template>
+        <div class="rank-list">
+          <div v-for="(item, index) in popularBooks" :key="item.bookId || index" class="rank-item">
+            <span class="rank-item__index">{{ index + 1 }}</span>
+            <span class="rank-item__name">{{ item.title }}</span>
+            <span class="rank-item__value">{{ item.borrowCount }} 次</span>
+          </div>
+        </div>
+      </el-card>
+
+      <el-card class="dashboard__card dashboard__card--narrow">
+        <template #header>
+          <h3 class="card-header__title">借阅状态分布</h3>
+        </template>
+        <div class="distribution-list">
+          <div v-for="item in statusDistribution" :key="item.status" class="distribution-item">
+            <div class="distribution-item__top">
+              <span>{{ item.label }}</span>
+              <span>{{ item.count }}</span>
+            </div>
+            <el-progress :percentage="calcDistribution(item.count)" :stroke-width="10" :show-text="false" />
           </div>
         </div>
       </el-card>
@@ -118,69 +115,138 @@
 </template>
 
 <script setup>
+import { computed, onMounted, ref } from 'vue'
+import { RouterLink } from 'vue-router'
 import {
-  Collection,
-  User,
-  DocumentCopy,
+  ArrowRight,
   Calendar,
-  ArrowRight
+  Collection,
+  DocumentCopy,
+  Odometer,
+  User,
+  Bell
 } from '@element-plus/icons-vue'
+import { getBorrowList } from '../api/borrow'
+import { getNoticeList } from '../api/notice'
+import { getReservationList } from '../api/reservation'
+import { getDashboardStats, getHealthStatus } from '../api/stats'
+import { BORROW_STATUS_OPTIONS, findOptionLabel, findOptionTag } from '../constants/options'
+import { useUserStore } from '../store/user'
+import { formatDate, formatDateTime } from '../utils/format'
 
-const stats = [
-  {
-    label: '馆藏图书',
-    value: '12,480',
-    icon: Collection,
-    iconBg: '#ecfdf5',
-    iconColor: '#15803d',
-    trend: 3.2
-  },
-  {
-    label: '注册读者',
-    value: '3,641',
-    icon: User,
-    iconBg: '#eff6ff',
-    iconColor: '#1d4ed8',
-    trend: 5.7
-  },
-  {
-    label: '本月借阅',
-    value: '864',
-    icon: DocumentCopy,
-    iconBg: '#fff7ed',
-    iconColor: '#b45309',
-    trend: -1.4
-  },
-  {
-    label: '预约待取',
-    value: '52',
-    icon: Calendar,
-    iconBg: '#fdf4ff',
-    iconColor: '#7e22ce',
-    trend: 12.0
+const userStore = useUserStore()
+const loading = ref(false)
+const managerStats = ref(null)
+const primaryTableData = ref([])
+const latestNotices = ref([])
+const popularBooks = ref([])
+const statusDistribution = ref([])
+const systemStatus = ref([
+  { name: '后端 API', status: 'ok', label: '正常' },
+  { name: '健康检查', status: 'ok', label: 'UP' }
+])
+
+const subtitle = computed(() => userStore.isManager ? '实时展示馆藏、借阅和审批概况' : '查看我的借阅、预约和最新公告')
+const primaryTableTitle = computed(() => userStore.isManager ? '近期借阅' : '我的借阅')
+const primaryTableLink = computed(() => userStore.isManager ? '/borrow' : '/borrow')
+
+const statCards = computed(() => {
+  if (userStore.isManager) {
+    const stats = managerStats.value || {}
+    return [
+      { label: '馆藏图书', value: stats.totalBooks || 0, icon: Collection, iconBg: '#ecfdf5', iconColor: '#15803d' },
+      { label: '注册读者', value: stats.totalReaders || 0, icon: User, iconBg: '#eff6ff', iconColor: '#1d4ed8' },
+      { label: '本月借阅', value: stats.monthBorrowCount || 0, icon: DocumentCopy, iconBg: '#fff7ed', iconColor: '#b45309' },
+      { label: '待审批', value: stats.pendingApprovalCount || 0, icon: Odometer, iconBg: '#f0fdfa', iconColor: '#0f766e' },
+      { label: '待取书', value: stats.pendingPickupCount || 0, icon: Calendar, iconBg: '#fdf4ff', iconColor: '#7e22ce' },
+      { label: '逾期数', value: stats.overdueCount || 0, icon: Bell, iconBg: '#fee2e2', iconColor: '#dc2626' }
+    ]
   }
-]
 
-const recentBorrows = [
-  { title: '深入理解计算机系统', reader: '张三', date: '2024-06-01', due: '2024-06-22', status: '借阅中' },
-  { title: 'Vue.js 3 实战', reader: '李四', date: '2024-05-28', due: '2024-06-18', status: '借阅中' },
-  { title: '代码整洁之道', reader: '王五', date: '2024-05-15', due: '2024-06-05', status: '已逾期' },
-  { title: '算法导论', reader: '赵六', date: '2024-05-10', due: '2024-05-31', status: '已归还' },
-  { title: '人月神话', reader: '孙七', date: '2024-05-05', due: '2024-05-26', status: '已归还' }
-]
+  return [
+    { label: '当前借阅', value: managerStats.value?.activeBorrowCount || 0, icon: DocumentCopy, iconBg: '#ecfdf5', iconColor: '#15803d' },
+    { label: '有效预约', value: managerStats.value?.reservationCount || 0, icon: Calendar, iconBg: '#eff6ff', iconColor: '#1d4ed8' },
+    { label: '最新公告', value: latestNotices.value.length, icon: Bell, iconBg: '#fff7ed', iconColor: '#b45309' },
+    { label: '可用功能', value: 4, icon: Collection, iconBg: '#f0fdfa', iconColor: '#0f766e' }
+  ]
+})
 
-const quickLinks = [
-  { label: '图书管理', to: '/books', icon: Collection, bg: '#ecfdf5', color: '#15803d' },
-  { label: '读者管理', to: '/users', icon: User, bg: '#eff6ff', color: '#1d4ed8' },
-  { label: '借阅管理', to: '/borrow', icon: DocumentCopy, bg: '#fff7ed', color: '#b45309' },
-  { label: '预约管理', to: '/reserve', icon: Calendar, bg: '#fdf4ff', color: '#7e22ce' }
-]
+const quickLinks = computed(() => {
+  if (userStore.isManager) {
+    return [
+      { label: '图书管理', to: '/books', icon: Collection, bg: '#ecfdf5', color: '#15803d' },
+      { label: '用户管理', to: '/users', icon: User, bg: '#eff6ff', color: '#1d4ed8' },
+      { label: '借阅管理', to: '/borrow', icon: DocumentCopy, bg: '#fff7ed', color: '#b45309' },
+      { label: '公告管理', to: '/notices', icon: Bell, bg: '#fdf4ff', color: '#7e22ce' }
+    ]
+  }
 
-const services = [
-  { name: '后端 API', status: 'ok', statusText: '正常' },
-  { name: '数据库', status: 'ok', statusText: '正常' },
-  { name: '存储服务', status: 'warn', statusText: '降级' }
-]
+  return [
+    { label: '图书查询', to: '/books', icon: Collection, bg: '#ecfdf5', color: '#15803d' },
+    { label: '我的借阅', to: '/borrow', icon: DocumentCopy, bg: '#eff6ff', color: '#1d4ed8' },
+    { label: '我的预约', to: '/reserve', icon: Calendar, bg: '#fff7ed', color: '#b45309' },
+    { label: '系统公告', to: '/notices', icon: Bell, bg: '#fdf4ff', color: '#7e22ce' }
+  ]
+})
+
+async function loadManagerDashboard() {
+  const [stats, borrows, health] = await Promise.all([
+    getDashboardStats(),
+    getBorrowList({ page: 1, size: 5 }),
+    getHealthStatus().catch(() => ({ status: 'DOWN' }))
+  ])
+
+  managerStats.value = stats
+  primaryTableData.value = borrows.records || []
+  popularBooks.value = stats.popularBooks || []
+  statusDistribution.value = stats.borrowStatusDistribution || []
+  systemStatus.value = [
+    { name: '后端 API', status: health.status === 'UP' ? 'ok' : 'err', label: health.status || '未知' },
+    { name: '健康检查', status: health.status === 'UP' ? 'ok' : 'err', label: health.status === 'UP' ? 'UP' : '异常' }
+  ]
+}
+
+async function loadReaderDashboard() {
+  const [displayBorrows, allBorrows, reservationData, noticeData] = await Promise.all([
+    getBorrowList({ page: 1, size: 5 }),
+    getBorrowList({ page: 1, size: 200 }),
+    getReservationList({ page: 1, size: 20 }),
+    getNoticeList({ page: 1, size: 3 })
+  ])
+
+  primaryTableData.value = displayBorrows.records || []
+  latestNotices.value = noticeData.records || []
+  const borrowRecords = allBorrows.records || []
+  managerStats.value = {
+    activeBorrowCount: borrowRecords.filter(item => [1, 2, 5].includes(item.status)).length,
+    reservationCount: reservationData.total || 0
+  }
+}
+
+function calcDistribution(count) {
+  const total = statusDistribution.value.reduce((sum, item) => sum + Number(item.count || 0), 0)
+  if (!total) {
+    return 0
+  }
+  return Math.round((Number(count || 0) / total) * 100)
+}
+
+async function loadDashboard() {
+  loading.value = true
+  try {
+    if (userStore.isManager) {
+      await loadManagerDashboard()
+    } else {
+      await loadReaderDashboard()
+    }
+  } finally {
+    loading.value = false
+  }
+}
+
+onMounted(() => {
+  loadDashboard()
+})
 </script>
 
 <style lang="scss" scoped>
@@ -210,7 +276,7 @@ const services = [
 // ── Stat grid ─────────────────────────────────────────────────────────────────
 .stat-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: $space-6;
   margin-bottom: $space-8;
 
@@ -287,6 +353,10 @@ const services = [
   }
 }
 
+.dashboard__grid--bottom {
+  margin-top: $space-6;
+}
+
 .dashboard__card {
   border-radius: $radius-lg !important;
 
@@ -305,6 +375,10 @@ const services = [
   display: flex;
   align-items: center;
   justify-content: space-between;
+}
+
+.card-header__link {
+  font-size: $font-size-sm;
 }
 
 .card-header__title {
@@ -404,5 +478,66 @@ const services = [
   &--ok   { background: #dcfce7; color: $color-success; }
   &--warn { background: #fef3c7; color: $color-warning; }
   &--err  { background: #fee2e2; color: $color-error;   }
+}
+
+.rank-list,
+.distribution-list,
+.notice-list {
+  display: flex;
+  flex-direction: column;
+  gap: $space-3;
+}
+
+.rank-item,
+.notice-item {
+  display: flex;
+  align-items: center;
+  gap: $space-3;
+  padding: $space-3;
+  background: $color-bg;
+  border-radius: $radius-md;
+}
+
+.rank-item__index {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: $radius-full;
+  background: $color-primary-light;
+  color: $color-primary-dark;
+  font-weight: $font-weight-bold;
+}
+
+.rank-item__name {
+  flex: 1;
+}
+
+.rank-item__value,
+.notice-item__meta {
+  color: $color-text-muted;
+  font-size: $font-size-sm;
+}
+
+.notice-item {
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.notice-item__title {
+  font-weight: $font-weight-medium;
+}
+
+.distribution-item {
+  display: flex;
+  flex-direction: column;
+  gap: $space-2;
+}
+
+.distribution-item__top {
+  display: flex;
+  justify-content: space-between;
+  font-size: $font-size-sm;
 }
 </style>

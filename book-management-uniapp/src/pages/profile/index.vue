@@ -1,266 +1,299 @@
 <template>
-  <view class="page">
-    <!-- Profile header -->
-    <view class="profile-header">
-      <view class="profile-header__avatar" aria-label="用户头像">
-        <text class="profile-header__avatar-text" aria-hidden="true">管</text>
-      </view>
-      <text class="profile-header__name">管理员</text>
-      <text class="profile-header__role">图书管理员</text>
+  <scroll-view class="page-shell profile-page" scroll-y refresher-enabled :refresher-triggered="refreshing" @refresherrefresh="loadProfile">
+    <view class="profile-hero card">
+      <view class="profile-hero__avatar">{{ displayInitial }}</view>
+      <text class="profile-hero__name">{{ userStore.displayName }}</text>
+      <text class="profile-hero__meta">{{ userStore.readerInfo?.readerCardNo || '未办理借阅证' }}</text>
+      <text class="profile-hero__meta">{{ readerTypeLabel }}</text>
     </view>
 
-    <!-- Borrow stats -->
-    <view class="stats-row" aria-label="借阅统计">
-      <view v-for="stat in borrowStats" :key="stat.label" class="stat-item">
-        <text class="stat-item__value">{{ stat.value }}</text>
-        <text class="stat-item__label">{{ stat.label }}</text>
-      </view>
+    <view v-if="!userStore.isAuthenticated" class="card auth-card" @tap="goLogin">
+      <text class="auth-card__title">尚未登录</text>
+      <text class="auth-card__desc">登录后可查看借阅记录、预约记录和读者证信息。</text>
     </view>
 
-    <!-- Menu items -->
-    <view class="section">
-      <text class="section__title">我的服务</text>
-      <view class="menu-list">
-        <view
-          v-for="item in menuItems"
-          :key="item.label"
-          class="menu-item"
-          hover-class="menu-item--hover"
-          hover-stay-time="80"
-        >
-          <view class="menu-item__icon" :style="{ background: item.bg }" aria-hidden="true">
-            <text class="menu-item__emoji">{{ item.icon }}</text>
-          </view>
-          <text class="menu-item__label">{{ item.label }}</text>
-          <text class="menu-item__arrow" aria-hidden="true">›</text>
-        </view>
+    <view class="stats-grid">
+      <view class="stat-card card">
+        <text class="stat-card__value">{{ currentBorrowCount }}</text>
+        <text class="stat-card__label">当前借阅</text>
+      </view>
+      <view class="stat-card card">
+        <text class="stat-card__value">{{ historyBorrowCount }}</text>
+        <text class="stat-card__label">历史借阅</text>
+      </view>
+      <view class="stat-card card">
+        <text class="stat-card__value">{{ activeReservationCount }}</text>
+        <text class="stat-card__label">有效预约</text>
+      </view>
+      <view class="stat-card card">
+        <text class="stat-card__value">{{ userStore.readerInfo?.creditScore || 0 }}</text>
+        <text class="stat-card__label">信用积分</text>
       </view>
     </view>
 
-    <!-- Log out -->
-    <view class="logout-wrap">
-      <view class="logout-btn" hover-class="logout-btn--hover" hover-stay-time="80">
-        <text class="logout-btn__text">退出登录</text>
+    <view class="card reader-card">
+      <text class="section-title">读者信息</text>
+      <view class="info-row"><text>借阅证号</text><text>{{ userStore.readerInfo?.readerCardNo || '未办理' }}</text></view>
+      <view class="info-row"><text>借阅上限</text><text>{{ userStore.readerInfo?.maxBorrowCount || 0 }}</text></view>
+      <view class="info-row"><text>当前在借</text><text>{{ userStore.readerInfo?.currentBorrowCount || 0 }}</text></view>
+      <view class="info-row"><text>有效期限</text><text>{{ validRange }}</text></view>
+      <view class="info-row"><text>黑名单状态</text><text>{{ userStore.readerInfo?.isBlacklist ? '已拉黑' : '正常' }}</text></view>
+    </view>
+
+    <view class="card service-card">
+      <text class="section-title">我的服务</text>
+      <view class="menu-item" @tap="openBorrowPage"><text>我的借阅</text><text>›</text></view>
+      <view class="menu-item" @tap="openReservationPage"><text>预约记录</text><text>›</text></view>
+      <view class="menu-item" @tap="openNoticePage"><text>系统公告</text><text>›</text></view>
+      <view class="menu-item" @tap="openSearchPage"><text>图书搜索</text><text>›</text></view>
+    </view>
+
+    <view class="card config-card">
+      <text class="section-title">开发配置</text>
+      <text class="section-subtitle">当前请求地址可在开发环境中直接修改。</text>
+      <input v-model="baseUrl" class="config-card__input" placeholder="http://127.0.0.1:8080/api" />
+      <view class="config-card__actions">
+        <button class="btn btn--ghost" @tap="resetBaseUrl">默认地址</button>
+        <button class="btn btn--primary" @tap="saveBaseUrl">保存地址</button>
       </view>
     </view>
 
-    <!-- Placeholder notice -->
-    <view class="notice-card">
-      <text class="notice-card__text">
-        个人中心功能（借阅证、借阅记录、预约记录）将在后续迭代中完整实现。
-      </text>
-    </view>
-  </view>
+    <button v-if="userStore.isAuthenticated" class="logout-btn" @tap="handleLogout">退出登录</button>
+  </scroll-view>
 </template>
 
 <script setup>
-const borrowStats = [
-  { label: '在借', value: '2' },
-  { label: '已借', value: '18' },
-  { label: '逾期', value: '0' }
-]
+import { computed, ref } from 'vue'
+import { onLoad, onShow } from '@dcloudio/uni-app'
+import { getBorrowList } from '../../api/borrow'
+import { getReservationList } from '../../api/reservation'
+import { useUserStore } from '../../store/user'
+import { getBaseUrl, getDefaultBaseUrl, setBaseUrl } from '../../utils/config'
+import { formatDate } from '../../utils/format'
+import { getReaderTypeLabel } from '../../utils/options'
 
-const menuItems = [
-  { label: '我的借阅', icon: '📖', bg: '#ecfdf5' },
-  { label: '预约记录', icon: '📅', bg: '#eff6ff' },
-  { label: '借阅证', icon: '🪪', bg: '#fff7ed' },
-  { label: '消息通知', icon: '🔔', bg: '#fdf4ff' },
-  { label: '设置', icon: '⚙️', bg: '#f1f5f9' }
-]
+const userStore = useUserStore()
+const refreshing = ref(false)
+const baseUrl = ref(getBaseUrl())
+const borrowRecords = ref([])
+const reservationRecords = ref([])
+
+const displayInitial = computed(() => (userStore.displayName || '图').slice(0, 1))
+const readerTypeLabel = computed(() => getReaderTypeLabel(userStore.readerInfo?.readerType))
+const currentBorrowCount = computed(() => borrowRecords.value.filter(item => [0, 1, 2, 5].includes(item.status)).length)
+const historyBorrowCount = computed(() => borrowRecords.value.filter(item => [3, 4].includes(item.status)).length)
+const activeReservationCount = computed(() => reservationRecords.value.filter(item => [0, 1].includes(item.status)).length)
+const validRange = computed(() => {
+  if (!userStore.readerInfo) {
+    return '未设置'
+  }
+  return `${formatDate(userStore.readerInfo.validDateStart)} 至 ${formatDate(userStore.readerInfo.validDateEnd)}`
+})
+
+function goLogin() {
+  uni.navigateTo({ url: '/pages/login/index' })
+}
+
+function ensureLogin(callback) {
+  if (userStore.isAuthenticated) {
+    callback()
+    return
+  }
+  goLogin()
+}
+
+function openBorrowPage() {
+  ensureLogin(() => uni.navigateTo({ url: '/pages/borrow/index' }))
+}
+
+function openReservationPage() {
+  ensureLogin(() => uni.navigateTo({ url: '/pages/reservation/index' }))
+}
+
+function openNoticePage() {
+  uni.navigateTo({ url: '/pages/notices/index' })
+}
+
+function openSearchPage() {
+  uni.navigateTo({ url: '/pages/search/index' })
+}
+
+function resetBaseUrl() {
+  baseUrl.value = getDefaultBaseUrl()
+}
+
+function saveBaseUrl() {
+  setBaseUrl(baseUrl.value.trim() || getDefaultBaseUrl())
+  uni.showToast({ title: '保存成功', icon: 'success' })
+}
+
+async function handleLogout() {
+  await userStore.logout()
+  uni.showToast({ title: '已退出', icon: 'success' })
+  setTimeout(() => {
+    uni.switchTab({ url: '/pages/index/index' })
+  }, 300)
+}
+
+async function loadProfile() {
+  refreshing.value = true
+  try {
+    await userStore.bootstrap()
+    if (!userStore.isAuthenticated) {
+      borrowRecords.value = []
+      reservationRecords.value = []
+      return
+    }
+    const [borrowPage, reservationPage] = await Promise.all([
+      getBorrowList({ page: 1, size: 100 }),
+      getReservationList({ page: 1, size: 100 })
+    ])
+    borrowRecords.value = borrowPage.records || []
+    reservationRecords.value = reservationPage.records || []
+  } finally {
+    refreshing.value = false
+    uni.stopPullDownRefresh()
+  }
+}
+
+onLoad(loadProfile)
+onShow(loadProfile)
 </script>
 
 <style lang="scss" scoped>
 @import '../../styles/variables.scss';
 
-.page {
-  min-height: 100vh;
-  padding-bottom: $space-8;
-  background: $color-bg;
+.profile-page {
+  display: flex;
+  flex-direction: column;
+  gap: $space-4;
 }
 
-// ── Profile header ────────────────────────────────────────────────────────────
-.profile-header {
+.profile-hero {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: $space-8 $space-4 $space-6;
   background: linear-gradient(135deg, #0f766e 0%, #0d9488 100%);
+  color: #ffffff;
 }
 
-.profile-header__avatar {
+.profile-hero__avatar {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 128rpx;
-  height: 128rpx;
+  width: 120rpx;
+  height: 120rpx;
   border-radius: $radius-full;
-  background: rgba(255, 255, 255, 0.25);
-  border: 4rpx solid rgba(255, 255, 255, 0.5);
-  margin-bottom: $space-3;
-}
-
-.profile-header__avatar-text {
+  background: rgba(255, 255, 255, 0.18);
   font-size: $font-size-2xl;
   font-weight: $font-weight-bold;
-  color: #ffffff;
 }
 
-.profile-header__name {
+.profile-hero__name {
   display: block;
+  margin-top: $space-3;
   font-size: $font-size-xl;
   font-weight: $font-weight-bold;
-  color: #ffffff;
 }
 
-.profile-header__role {
+.profile-hero__meta {
   display: block;
   margin-top: $space-1;
   font-size: $font-size-sm;
-  color: rgba(255, 255, 255, 0.8);
+  opacity: 0.85;
 }
 
-// ── Stats row ─────────────────────────────────────────────────────────────────
-.stats-row {
-  display: flex;
-  background: $color-surface;
-  border-bottom: 2rpx solid $color-border;
-  box-shadow: $shadow-sm;
+.auth-card__title {
+  display: block;
+  font-size: $font-size-base;
+  font-weight: $font-weight-bold;
 }
 
-.stat-item {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: $space-4 $space-2;
-  border-right: 2rpx solid $color-border;
-
-  &:last-child {
-    border-right: none;
-  }
+.auth-card__desc {
+  display: block;
+  margin-top: $space-1;
+  font-size: $font-size-sm;
+  color: $color-text-secondary;
 }
 
-.stat-item__value {
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: $space-3;
+}
+
+.stat-card__value {
   display: block;
   font-size: $font-size-2xl;
   font-weight: $font-weight-bold;
   color: $color-primary;
 }
 
-.stat-item__label {
+.stat-card__label {
   display: block;
   margin-top: $space-1;
-  font-size: $font-size-xs;
   color: $color-text-muted;
-}
-
-// ── Section ───────────────────────────────────────────────────────────────────
-.section {
-  padding: $space-4;
-}
-
-.section__title {
-  display: block;
   font-size: $font-size-sm;
-  font-weight: $font-weight-bold;
-  color: $color-text-muted;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  margin-bottom: $space-2;
 }
 
-// ── Menu list ─────────────────────────────────────────────────────────────────
-.menu-list {
-  background: $color-surface;
-  border-radius: $radius-md;
-  overflow: hidden;
-  box-shadow: $shadow-sm;
+.reader-card,
+.service-card,
+.config-card {
+  display: flex;
+  flex-direction: column;
+  gap: $space-3;
 }
 
+.info-row,
 .menu-item {
   display: flex;
   align-items: center;
-  gap: $space-3;
-  padding: $space-3 $space-4;
+  justify-content: space-between;
+  padding: $space-2 0;
   border-bottom: 2rpx solid $color-border;
-  transition: background 0.1s;
-
-  &:last-child {
-    border-bottom: none;
-  }
+  font-size: $font-size-sm;
+  color: $color-text-secondary;
 }
 
-.menu-item--hover {
-  background: $color-bg;
+.info-row:last-child,
+.menu-item:last-child {
+  border-bottom: none;
 }
 
-.menu-item__icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 72rpx;
-  height: 72rpx;
+.config-card__input {
+  height: 84rpx;
+  padding: 0 $space-3;
   border-radius: $radius-md;
-  flex-shrink: 0;
+  background: $color-bg;
+  border: 2rpx solid $color-border;
 }
 
-.menu-item__emoji {
-  font-size: $font-size-xl;
-  line-height: 1;
+.config-card__actions {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: $space-3;
 }
 
-.menu-item__label {
-  flex: 1;
+.btn,
+.logout-btn {
+  height: 84rpx;
+  border: none;
+  border-radius: $radius-md;
   font-size: $font-size-base;
-  color: $color-text-primary;
-  font-weight: $font-weight-medium;
 }
 
-.menu-item__arrow {
-  color: $color-text-muted;
-  font-size: $font-size-xl;
-  flex-shrink: 0;
+.btn--primary {
+  background: $color-primary;
+  color: #ffffff;
 }
 
-// ── Logout ────────────────────────────────────────────────────────────────────
-.logout-wrap {
-  padding: $space-4;
-  margin-bottom: $space-2;
+.btn--ghost {
+  background: #e6fffb;
+  color: $color-primary-dark;
 }
 
 .logout-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 88rpx;
-  background: $color-surface;
-  border: 2rpx solid #fca5a5;
-  border-radius: $radius-md;
-  box-shadow: $shadow-sm;
-}
-
-.logout-btn--hover {
-  background: #fef2f2;
-}
-
-.logout-btn__text {
-  font-size: $font-size-base;
-  font-weight: $font-weight-medium;
+  background: #fee2e2;
   color: $color-error;
-}
-
-// ── Notice card ───────────────────────────────────────────────────────────────
-.notice-card {
-  margin: 0 $space-4;
-  padding: $space-3 $space-4;
-  background: #eff6ff;
-  border-left: 8rpx solid $color-info;
-  border-radius: $radius-sm;
-}
-
-.notice-card__text {
-  font-size: $font-size-sm;
-  color: $color-info;
-  line-height: $line-height-loose;
 }
 </style>

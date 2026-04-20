@@ -1,0 +1,49 @@
+@import 'uview-plus/theme.scss';
+
+$color-primary:        #0f766e;
+$color-primary-dark:   #0d5c56;
+$color-primary-light:  #ccfbf1;
+
+$color-bg:             #f6f8fb;
+$color-border:         #e2e8f0;
+
+$color-text-primary:   #1e293b;
+$color-text-secondary: #475569;
+$color-text-muted:     #64748b;
+
+$color-success: #15803d;
+$color-warning: #b45309;
+$color-error:   #dc2626;
+$color-info:    #1d4ed8;
+
+$u-main-color: $color-text-primary;
+$u-content-color: $color-text-secondary;
+$u-tips-color: $color-text-muted;
+$u-light-color: $color-border;
+$u-border-color: $color-border;
+$u-bg-color: $color-bg;
+
+$u-primary: $color-primary;
+$u-primary-dark: $color-primary-dark;
+$u-primary-disabled: $color-primary-light;
+$u-primary-light: $color-primary-light;
+
+$u-warning: $color-warning;
+$u-warning-dark: $color-warning;
+$u-warning-disabled: #facc15;
+$u-warning-light: #fef3c7;
+
+$u-success: $color-success;
+$u-success-dark: $color-success;
+$u-success-disabled: #86efac;
+$u-success-light: #dcfce7;
+
+$u-error: $color-error;
+$u-error-dark: $color-error;
+$u-error-disabled: #fca5a5;
+$u-error-light: #fee2e2;
+
+$u-info: $color-info;
+$u-info-dark: $color-info;
+$u-info-disabled: #93c5fd;
+$u-info-light: #dbeafe;

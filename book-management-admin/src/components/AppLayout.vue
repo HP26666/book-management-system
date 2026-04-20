@@ -1,8 +1,6 @@
 <template>
   <div class="app-layout" :class="{ 'sidebar-collapsed': collapsed }">
-    <!-- ── Sidebar ─────────────────────────────────────────────────────── -->
-    <aside class="sidebar" role="navigation" aria-label="主导航">
-      <!-- Logo -->
+    <aside class="sidebar" :class="{ 'sidebar--mobile-open': mobileMenuOpen }" role="navigation" aria-label="主导航">
       <div class="sidebar__logo" aria-label="图书管理系统">
         <el-icon class="sidebar__logo-icon" :size="28" color="#0f766e">
           <Reading />
@@ -12,11 +10,10 @@
         </Transition>
       </div>
 
-      <!-- Navigation -->
-      <nav>
+      <nav class="sidebar__nav">
         <el-menu
           :default-active="activeRoute"
-          :collapse="collapsed"
+          :collapse="collapsed && !mobileMenuOpen"
           :collapse-transition="false"
           background-color="#0f172a"
           text-color="#cbd5e1"
@@ -24,35 +21,15 @@
           router
           class="sidebar__menu"
           aria-label="功能导航"
+          @select="handleMenuSelect"
         >
-          <el-menu-item index="/dashboard">
-            <el-icon><Odometer /></el-icon>
-            <template #title>仪表板</template>
-          </el-menu-item>
-
-          <el-menu-item index="/books">
-            <el-icon><Collection /></el-icon>
-            <template #title>图书管理</template>
-          </el-menu-item>
-
-          <el-menu-item index="/users" disabled>
-            <el-icon><User /></el-icon>
-            <template #title>读者管理</template>
-          </el-menu-item>
-
-          <el-menu-item index="/borrow" disabled>
-            <el-icon><DocumentCopy /></el-icon>
-            <template #title>借阅管理</template>
-          </el-menu-item>
-
-          <el-menu-item index="/reserve" disabled>
-            <el-icon><Calendar /></el-icon>
-            <template #title>预约管理</template>
+          <el-menu-item v-for="item in menus" :key="item.name" :index="`/${item.path}`">
+            <el-icon><component :is="iconMap[item.meta.icon] || Menu" /></el-icon>
+            <template #title>{{ item.meta.title }}</template>
           </el-menu-item>
         </el-menu>
       </nav>
 
-      <!-- Collapse toggle -->
       <button
         class="sidebar__toggle"
         :aria-label="collapsed ? '展开侧边栏' : '收起侧边栏'"
@@ -60,37 +37,31 @@
         @click="collapsed = !collapsed"
       >
         <el-icon>
-          <component :is="collapsed ? 'Expand' : 'Fold'" />
+          <component :is="collapsed ? Expand : Fold" />
         </el-icon>
       </button>
     </aside>
 
-    <!-- ── Main area ──────────────────────────────────────────────────── -->
     <div class="main-area">
-      <!-- Top bar -->
       <header class="topbar" role="banner">
         <div class="topbar__left">
-          <!-- Mobile menu toggle -->
-          <button
-            class="topbar__menu-btn"
-            aria-label="切换移动导航"
-            @click="mobileMenuOpen = !mobileMenuOpen"
-          >
+          <button class="topbar__menu-btn" aria-label="切换移动导航" @click="mobileMenuOpen = !mobileMenuOpen">
             <el-icon :size="20"><Menu /></el-icon>
           </button>
 
-          <nav aria-label="面包屑导航">
+          <div>
             <el-breadcrumb separator="/">
-              <el-breadcrumb-item :to="{ path: '/' }">首页</el-breadcrumb-item>
+              <el-breadcrumb-item :to="{ path: '/dashboard' }">首页</el-breadcrumb-item>
               <el-breadcrumb-item v-if="pageTitle">{{ pageTitle }}</el-breadcrumb-item>
             </el-breadcrumb>
-          </nav>
+            <p class="topbar__subtitle">{{ welcomeText }}</p>
+          </div>
         </div>
 
         <div class="topbar__right">
-          <el-tooltip content="通知" placement="bottom">
+          <el-tooltip :content="notificationTooltip" placement="bottom">
             <button class="topbar__icon-btn" aria-label="通知">
-              <el-badge :value="3" class="topbar__badge">
+              <el-badge :value="notificationCount" :hidden="notificationCount === 0" class="topbar__badge">
                 <el-icon :size="20"><Bell /></el-icon>
               </el-badge>
             </button>
@@ -98,21 +69,20 @@
 
           <el-dropdown trigger="click" aria-label="用户菜单">
             <button class="topbar__avatar-btn" aria-label="打开用户菜单">
-              <el-avatar :size="34" style="background-color: var(--color-primary)">管</el-avatar>
-              <span class="topbar__username">管理员</span>
+              <el-avatar :size="34" style="background-color: var(--color-primary)">{{ userInitial }}</el-avatar>
+              <span class="topbar__username">{{ displayName }}</span>
               <el-icon class="topbar__caret"><CaretBottom /></el-icon>
             </button>
             <template #dropdown>
               <el-dropdown-menu>
-                <el-dropdown-item>个人设置</el-dropdown-item>
-                <el-dropdown-item divided>退出登录</el-dropdown-item>
+                <el-dropdown-item disabled>{{ roleSummary }}</el-dropdown-item>
+                <el-dropdown-item divided @click="handleLogout">退出登录</el-dropdown-item>
               </el-dropdown-menu>
             </template>
           </el-dropdown>
         </div>
       </header>
 
-      <!-- Page content -->
       <main class="page-content" id="main-content" tabindex="-1">
         <RouterView v-slot="{ Component }">
           <Transition name="fade" mode="out-in">
@@ -122,7 +92,6 @@
       </main>
     </div>
 
-    <!-- Mobile overlay -->
     <Transition name="fade">
       <div
         v-if="mobileMenuOpen"
@@ -135,15 +104,75 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
-import { useRoute } from 'vue-router'
+import * as Icons from '@element-plus/icons-vue'
+import { computed, onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { ElMessage } from 'element-plus'
+import { getDashboardStats } from '../api/stats'
+import { ROLE_OPTIONS } from '../constants/options'
+import { usePermissionStore } from '../store/permission'
+import { useUserStore } from '../store/user'
 
 const route = useRoute()
+const router = useRouter()
+const userStore = useUserStore()
+const permissionStore = usePermissionStore()
+
 const collapsed = ref(false)
 const mobileMenuOpen = ref(false)
+const notificationCount = ref(0)
 
+const iconMap = Icons
+const menus = computed(() => permissionStore.accessibleMenus)
 const activeRoute = computed(() => route.path)
 const pageTitle = computed(() => route.meta?.title ?? '')
+const displayName = computed(() => userStore.userInfo?.realName || userStore.userInfo?.username || '未登录')
+const userInitial = computed(() => displayName.value.slice(0, 1) || '图')
+const roleSummary = computed(() => {
+  const roles = userStore.roles
+  if (!roles.length) {
+    return '未分配角色'
+  }
+  return roles.map(role => ROLE_OPTIONS.find(item => item.code === role)?.label || role).join(' / ')
+})
+const notificationTooltip = computed(() => userStore.isManager ? '待审批借阅数量' : '当前提醒')
+const welcomeText = computed(() => userStore.isManager ? '管理端已连接真实业务接口' : '当前账号可查看个人借阅、预约与公告')
+
+async function loadBadge() {
+  if (!userStore.isManager) {
+    notificationCount.value = 0
+    return
+  }
+
+  try {
+    const stats = await getDashboardStats()
+    notificationCount.value = stats.pendingApprovalCount || 0
+  } catch {
+    notificationCount.value = 0
+  }
+}
+
+function handleMenuSelect() {
+  mobileMenuOpen.value = false
+}
+
+async function handleLogout() {
+  await userStore.logout()
+  ElMessage.success('已退出登录')
+  router.push('/login')
+}
+
+watch(
+  () => route.fullPath,
+  () => {
+    loadBadge()
+  },
+  { immediate: true }
+)
+
+onMounted(() => {
+  loadBadge()
+})
 </script>
 
 <style lang="scss" scoped>
@@ -172,7 +201,17 @@ const pageTitle = computed(() => route.meta?.title ?? '')
   overflow: hidden;
 
   @media (max-width: $bp-lg) {
-    display: none;
+    position: fixed;
+    left: 0;
+    transform: translateX(-100%);
+    z-index: 120;
+    display: flex;
+  }
+}
+
+.sidebar--mobile-open {
+  @media (max-width: $bp-lg) {
+    transform: translateX(0);
   }
 }
 
@@ -287,6 +326,12 @@ const pageTitle = computed(() => route.meta?.title ?? '')
   display: flex;
   align-items: center;
   gap: $space-4;
+}
+
+.topbar__subtitle {
+  margin-top: $space-1;
+  font-size: $font-size-sm;
+  color: $color-text-muted;
 }
 
 .topbar__right {
