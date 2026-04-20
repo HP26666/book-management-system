@@ -1,0 +1,59 @@
+// ─── UniApp Design Tokens ────────────────────────────────────────────────────
+// Shared SCSS variables for the book-management-uniapp mini program.
+// Use rpx for layout/spacing so sizes scale across device widths.
+// (750rpx == full screen width on the reference 375px device)
+
+// ── Colours ───────────────────────────────────────────────────────────────────
+$color-primary:        #0f766e;
+$color-primary-dark:   #0d5c56;
+$color-primary-light:  #ccfbf1;
+
+$color-bg:             #f6f8fb;
+$color-surface:        #ffffff;
+$color-border:         #e2e8f0;
+
+// Text — WCAG AA on white / #f6f8fb
+$color-text-primary:   #1e293b;   // ~13:1 on white
+$color-text-secondary: #475569;   // ~5.9:1 on white
+$color-text-muted:     #64748b;   // ~4.6:1 on white
+
+$color-success:  #15803d;
+$color-warning:  #b45309;
+$color-error:    #dc2626;
+$color-info:     #1d4ed8;
+
+// ── Spacing (rpx) ─────────────────────────────────────────────────────────────
+$space-1:  8rpx;
+$space-2:  16rpx;
+$space-3:  24rpx;
+$space-4:  32rpx;
+$space-5:  40rpx;
+$space-6:  48rpx;
+$space-8:  64rpx;
+
+// ── Typography (rpx) ──────────────────────────────────────────────────────────
+$font-size-xs:   20rpx;
+$font-size-sm:   24rpx;
+$font-size-base: 28rpx;  // ≈ 14px on 375px device
+$font-size-lg:   32rpx;
+$font-size-xl:   36rpx;
+$font-size-2xl:  40rpx;
+$font-size-3xl:  48rpx;
+
+$line-height-tight:  1.25;
+$line-height-normal: 1.5;
+$line-height-loose:  1.75;
+
+$font-weight-regular: 400;
+$font-weight-medium:  500;
+$font-weight-bold:    700;
+
+// ── Border radius (rpx) ───────────────────────────────────────────────────────
+$radius-sm:   8rpx;
+$radius-md:   16rpx;
+$radius-lg:   24rpx;
+$radius-full: 9999rpx;
+
+// ── Shadow (box-shadow for H5 / ignored silently on mp) ──────────────────────
+$shadow-sm: 0 2rpx 8rpx 0 rgba(0, 0, 0, 0.05);
+$shadow-md: 0 8rpx 24rpx 0 rgba(0, 0, 0, 0.08);
