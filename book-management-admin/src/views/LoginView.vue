@@ -72,11 +72,14 @@
 
 <script setup>
 import { ref, reactive } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { User, Lock } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
+import { useUserStore } from '../store/user'
 
 const router = useRouter()
+const route = useRoute()
+const userStore = useUserStore()
 const formRef = ref(null)
 const loading = ref(false)
 const rememberMe = ref(false)
@@ -103,12 +106,17 @@ async function handleLogin() {
   if (!valid) return
 
   loading.value = true
-  // Simulate API call — replace with real auth request
-  await new Promise(resolve => setTimeout(resolve, 800))
-  loading.value = false
-
-  ElMessage.success('登录成功')
-  router.push('/dashboard')
+  try {
+    await userStore.login({
+      username: form.username,
+      password: form.password
+    })
+    ElMessage.success('登录成功')
+    const redirect = userStore.resolveRedirect(route.query.redirect)
+    router.push(redirect)
+  } finally {
+    loading.value = false
+  }
 }
 </script>
 

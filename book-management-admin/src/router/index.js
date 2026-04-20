@@ -1,49 +1,69 @@
 import { createRouter, createWebHistory } from 'vue-router'
-
-const routes = [
-  {
-    path: '/login',
-    name: 'Login',
-    component: () => import('../views/LoginView.vue'),
-    meta: { title: '登录', public: true }
-  },
-  {
-    path: '/',
-    component: () => import('../components/AppLayout.vue'),
-    children: [
-      {
-        path: '',
-        redirect: '/dashboard'
-      },
-      {
-        path: 'dashboard',
-        name: 'Dashboard',
-        component: () => import('../views/DashboardView.vue'),
-        meta: { title: '仪表板' }
-      },
-      {
-        path: 'books',
-        name: 'Books',
-        component: () => import('../views/BooksView.vue'),
-        meta: { title: '图书管理' }
-      }
-    ]
-  },
-  {
-    path: '/:pathMatch(.*)*',
-    redirect: '/dashboard'
-  }
-]
+import { pinia } from '../store'
+import { routes } from './routes'
+import { usePermissionStore } from '../store/permission'
+import { useUserStore } from '../store/user'
 
 const router = createRouter({
   history: createWebHistory(),
   routes
 })
 
-router.beforeEach((to) => {
+router.beforeEach(async (to) => {
+  const userStore = useUserStore(pinia)
+  const permissionStore = usePermissionStore(pinia)
+
+  if (!userStore.initialized) {
+    userStore.hydrate()
+  }
+
   document.title = to.meta?.title
     ? `${to.meta.title} — 图书管理系统`
     : '图书管理系统'
+
+  if (to.meta?.public) {
+    if (to.path === '/login' && userStore.isAuthenticated) {
+      try {
+        if (!userStore.userInfo) {
+          await userStore.fetchMe()
+        }
+        return permissionStore.resolveHomePath()
+      } catch {
+        userStore.clearSession()
+      }
+    }
+    return true
+  }
+
+  if (!userStore.isAuthenticated) {
+    return {
+      path: '/login',
+      query: {
+        redirect: to.fullPath
+      }
+    }
+  }
+
+  try {
+    if (!userStore.userInfo) {
+      await userStore.fetchMe()
+    }
+  } catch {
+    userStore.clearSession()
+    return {
+      path: '/login',
+      query: {
+        redirect: to.fullPath
+      }
+    }
+  }
+
+  const requiredRoles = to.meta?.requiredRoles
+  if (!permissionStore.hasAnyRole(requiredRoles)) {
+    return permissionStore.resolveHomePath()
+  }
+
+  return true
 })
 
 export default router

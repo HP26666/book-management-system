@@ -1,89 +1,235 @@
 <template>
-  <view class="page">
-    <!-- Hero banner -->
-    <view class="hero">
-      <view class="hero__icon" aria-hidden="true">📚</view>
-      <text class="hero__title">图书管理系统</text>
-      <text class="hero__subtitle">发现好书，随时借阅</text>
+  <scroll-view class="page" scroll-y refresher-enabled :refresher-triggered="refreshing" @refresherrefresh="loadHome">
+    <view class="hero card">
+      <view class="hero__top">
+        <view>
+          <text class="hero__eyebrow">图书管理系统</text>
+          <text class="hero__title">发现好书，随时借阅</text>
+          <text class="hero__subtitle">支持检索、借阅申请、预约和个人记录管理。</text>
+        </view>
+        <view class="hero__badge">{{ userStore.isAuthenticated ? '已登录' : '游客浏览' }}</view>
+      </view>
+
+      <view class="hero-stats">
+        <view class="hero-stat">
+          <text class="hero-stat__value">{{ userStore.readerInfo?.currentBorrowCount || 0 }}</text>
+          <text class="hero-stat__label">当前借阅</text>
+        </view>
+        <view class="hero-stat">
+          <text class="hero-stat__value">{{ reservationCount }}</text>
+          <text class="hero-stat__label">有效预约</text>
+        </view>
+        <view class="hero-stat">
+          <text class="hero-stat__value">{{ userStore.readerInfo?.creditScore || 0 }}</text>
+          <text class="hero-stat__label">信用积分</text>
+        </view>
+      </view>
     </view>
 
-    <!-- Search bar -->
-    <view class="search-bar">
-      <text class="search-bar__icon" aria-hidden="true">🔍</text>
-      <text class="search-bar__placeholder">搜索书名、作者或 ISBN…</text>
+    <view class="search-bar" @tap="goSearch()">
+      <text class="search-bar__icon">🔍</text>
+      <text class="search-bar__placeholder">搜索书名、作者或 ISBN</text>
+      <text class="search-bar__cta">去搜索</text>
     </view>
 
-    <!-- Quick actions -->
+    <view v-if="!userStore.isAuthenticated" class="login-banner card" @tap="goLogin">
+      <view>
+        <text class="login-banner__title">登录后可直接借阅与预约</text>
+        <text class="login-banner__desc">开发环境支持 Mock 微信登录，无需等待公众号配置。</text>
+      </view>
+      <text class="login-banner__arrow">›</text>
+    </view>
+
     <view class="section">
-      <text class="section__title">快速入口</text>
+      <view class="section__header">
+        <text class="section-title">快速入口</text>
+      </view>
       <view class="quick-grid">
-        <view
-          v-for="action in quickActions"
-          :key="action.label"
-          class="quick-card"
-          :style="{ background: action.bg }"
-          hover-class="quick-card--hover"
-          hover-stay-time="100"
-        >
-          <text class="quick-card__icon" aria-hidden="true">{{ action.icon }}</text>
+        <view v-for="action in quickActions" :key="action.label" class="quick-card" :style="{ background: action.bg }" @tap="handleQuickAction(action)">
+          <text class="quick-card__icon">{{ action.icon }}</text>
           <text class="quick-card__label">{{ action.label }}</text>
         </view>
       </view>
     </view>
 
-    <!-- Recent notices -->
     <view class="section">
       <view class="section__header">
-        <text class="section__title">公告通知</text>
-        <text class="section__more">查看全部</text>
+        <view>
+          <text class="section-title">分类入口</text>
+          <text class="section-subtitle">常用图书分类快速跳转</text>
+        </view>
       </view>
-      <view class="notice-list">
-        <view
-          v-for="notice in notices"
-          :key="notice.id"
-          class="notice-item"
-          hover-class="notice-item--hover"
-          hover-stay-time="100"
-        >
-          <view class="notice-item__dot" :class="`notice-item__dot--${notice.type}`" aria-hidden="true" />
-          <view class="notice-item__body">
-            <text class="notice-item__title">{{ notice.title }}</text>
-            <text class="notice-item__date">{{ notice.date }}</text>
-          </view>
-          <text class="notice-item__arrow" aria-hidden="true">›</text>
+      <view class="category-grid">
+        <view v-for="item in categoryCards" :key="item.id" class="category-card" @tap="goCategory(item)">
+          <text class="category-card__name">{{ item.name }}</text>
+          <text class="category-card__meta">{{ item.children?.length || 0 }} 个子类</text>
         </view>
       </view>
     </view>
 
-    <!-- Tech stack tags (skeleton indicator) -->
-    <view class="tags-row" aria-label="技术栈">
-      <view v-for="tag in tags" :key="tag.label" class="tag" :style="{ background: tag.bg, color: tag.color }">
-        <text class="tag__text">{{ tag.label }}</text>
+    <view class="section">
+      <view class="section__header">
+        <view>
+          <text class="section-title">热门图书</text>
+          <text class="section-subtitle">优先展示当前可借图书</text>
+        </view>
+        <text class="section__more" @tap="goSearch()">查看全部</text>
+      </view>
+      <view class="book-list">
+        <view v-for="book in books" :key="book.id" class="book-card card" @tap="goBook(book.id)">
+          <image v-if="resolveCover(book.coverUrl)" :src="resolveCover(book.coverUrl)" class="book-card__cover" mode="aspectFill" />
+          <view v-else class="book-card__cover book-card__cover--placeholder">BOOK</view>
+          <view class="book-card__body">
+            <text class="book-card__title">{{ book.title }}</text>
+            <text class="book-card__author">{{ book.author || '未知作者' }}</text>
+            <text class="book-card__meta">{{ book.categoryName || '未分类' }} · {{ book.availableStock > 0 ? `可借 ${book.availableStock}` : '已无库存' }}</text>
+          </view>
+        </view>
       </view>
     </view>
-  </view>
+
+    <view class="section">
+      <view class="section__header">
+        <view>
+          <text class="section-title">公告通知</text>
+          <text class="section-subtitle">仅展示已发布公告</text>
+        </view>
+        <text class="section__more" @tap="goNotices">全部公告</text>
+      </view>
+
+      <view class="notice-list card">
+        <view v-for="notice in notices" :key="notice.id" class="notice-item" @tap="goNotices">
+          <view class="notice-item__left">
+            <text class="status-pill" :class="`status-pill--${getNoticeType(notice.type).className}`">{{ getNoticeType(notice.type).label }}</text>
+          </view>
+          <view class="notice-item__body">
+            <text class="notice-item__title">{{ notice.title }}</text>
+            <text class="notice-item__date">{{ formatDateTime(notice.publishTime) }}</text>
+          </view>
+        </view>
+      </view>
+    </view>
+  </scroll-view>
 </template>
 
 <script setup>
+import { computed, ref } from 'vue'
+import { onLoad, onShow } from '@dcloudio/uni-app'
+import { getBookList } from '../../api/book'
+import { getCategoryTree } from '../../api/category'
+import { getNoticeList } from '../../api/notice'
+import { getReservationList } from '../../api/reservation'
+import { useUserStore } from '../../store/user'
+import { getBaseUrl } from '../../utils/config'
+import { formatDateTime } from '../../utils/format'
+import { getNoticeType } from '../../utils/options'
+import { flattenCategoryTree } from '../../utils/tree'
+
+const userStore = useUserStore()
+const refreshing = ref(false)
+const categories = ref([])
+const books = ref([])
+const notices = ref([])
+const reservationCount = ref(0)
+
 const quickActions = [
-  { label: '图书搜索', icon: '🔍', bg: '#ecfdf5' },
-  { label: '我的借阅', icon: '📖', bg: '#eff6ff' },
-  { label: '图书预约', icon: '📅', bg: '#fff7ed' },
-  { label: '借阅记录', icon: '📋', bg: '#fdf4ff' }
+  { label: '图书搜索', icon: '🔍', bg: '#ecfdf5', action: 'search' },
+  { label: '我的借阅', icon: '📖', bg: '#eff6ff', action: 'borrow' },
+  { label: '预约记录', icon: '📅', bg: '#fff7ed', action: 'reservation' },
+  { label: '公告通知', icon: '📢', bg: '#fdf4ff', action: 'notice' }
 ]
 
-const notices = [
-  { id: 1, title: '图书馆开放时间调整通知', date: '2024-06-01', type: 'info' },
-  { id: 2, title: '新书上架：计算机与 AI 专区', date: '2024-05-28', type: 'success' },
-  { id: 3, title: '逾期书籍请尽快归还', date: '2024-05-20', type: 'warn' }
-]
+const categoryCards = computed(() => categories.value.slice(0, 6))
 
-const tags = [
-  { label: 'Spring Boot 3', bg: '#dcfce7', color: '#15803d' },
-  { label: 'Vue 3', bg: '#dbeafe', color: '#1d4ed8' },
-  { label: 'PostgreSQL', bg: '#fef3c7', color: '#b45309' },
-  { label: 'Docker', bg: '#ede9fe', color: '#6d28d9' }
-]
+function resolveCover(coverUrl) {
+  if (!coverUrl) {
+    return ''
+  }
+  if (/^https?:\/\//.test(coverUrl)) {
+    return coverUrl
+  }
+  return `${getBaseUrl().replace(/\/api$/, '')}${coverUrl}`
+}
+
+function requireLogin(target) {
+  if (userStore.isAuthenticated) {
+    target()
+    return
+  }
+  uni.navigateTo({ url: '/pages/login/index' })
+}
+
+function goLogin() {
+  uni.navigateTo({ url: '/pages/login/index' })
+}
+
+function goSearch(keyword = '', categoryId = '') {
+  const query = []
+  if (keyword) {
+    query.push(`keyword=${encodeURIComponent(keyword)}`)
+  }
+  if (categoryId) {
+    query.push(`categoryId=${categoryId}`)
+  }
+  const suffix = query.length ? `?${query.join('&')}` : ''
+  uni.navigateTo({ url: `/pages/search/index${suffix}` })
+}
+
+function goCategory(item) {
+  goSearch('', item.id)
+}
+
+function goBook(id) {
+  uni.navigateTo({ url: `/pages/book-detail/index?id=${id}` })
+}
+
+function goNotices() {
+  uni.navigateTo({ url: '/pages/notices/index' })
+}
+
+function handleQuickAction(action) {
+  if (action.action === 'search') {
+    goSearch()
+    return
+  }
+  if (action.action === 'notice') {
+    goNotices()
+    return
+  }
+  if (action.action === 'borrow') {
+    requireLogin(() => uni.navigateTo({ url: '/pages/borrow/index' }))
+    return
+  }
+  if (action.action === 'reservation') {
+    requireLogin(() => uni.navigateTo({ url: '/pages/reservation/index' }))
+  }
+}
+
+async function loadHome() {
+  refreshing.value = true
+  try {
+    await userStore.bootstrap()
+    const tasks = [
+      getCategoryTree(),
+      getBookList({ page: 1, size: 6, status: 1 }),
+      getNoticeList({ page: 1, size: 4 })
+    ]
+    if (userStore.isAuthenticated) {
+      tasks.push(getReservationList({ page: 1, size: 50 }))
+    }
+    const [categoryTree, bookPage, noticePage, reservationPage] = await Promise.all(tasks)
+    categories.value = flattenCategoryTree(categoryTree).filter(item => item.level === 0)
+    books.value = bookPage.records || []
+    notices.value = noticePage.records || []
+    reservationCount.value = (reservationPage?.records || []).filter(item => [0, 1].includes(item.status)).length
+  } finally {
+    refreshing.value = false
+    uni.stopPullDownRefresh()
+  }
+}
+
+onLoad(loadHome)
+onShow(loadHome)
 </script>
 
 <style lang="scss" scoped>
@@ -91,48 +237,81 @@ const tags = [
 
 .page {
   min-height: 100vh;
-  padding: 0 0 $space-8;
+  padding: $space-4 $space-4 $space-8;
   background: $color-bg;
 }
 
-// ── Hero ──────────────────────────────────────────────────────────────────────
 .hero {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: $space-8 $space-4 $space-6;
   background: linear-gradient(135deg, #0f766e 0%, #0d9488 100%);
   color: #ffffff;
+  box-shadow: $shadow-md;
 }
 
-.hero__icon {
-  font-size: 80rpx;
-  margin-bottom: $space-2;
-  line-height: 1;
+.hero__top {
+  display: flex;
+  justify-content: space-between;
+  gap: $space-3;
+}
+
+.hero__eyebrow {
+  display: block;
+  font-size: $font-size-xs;
+  opacity: 0.85;
 }
 
 .hero__title {
   display: block;
-  font-size: $font-size-3xl;
+  margin-top: $space-2;
+  font-size: $font-size-2xl;
   font-weight: $font-weight-bold;
-  color: #ffffff;
-  text-align: center;
 }
 
 .hero__subtitle {
   display: block;
-  margin-top: $space-1;
+  margin-top: $space-2;
   font-size: $font-size-sm;
-  color: rgba(255, 255, 255, 0.85);
-  text-align: center;
+  color: rgba(255, 255, 255, 0.82);
 }
 
-// ── Search bar ────────────────────────────────────────────────────────────────
+.hero__badge {
+  align-self: flex-start;
+  padding: 10rpx 18rpx;
+  border-radius: $radius-full;
+  background: rgba(255, 255, 255, 0.18);
+  font-size: $font-size-xs;
+}
+
+.hero-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: $space-3;
+  margin-top: $space-4;
+}
+
+.hero-stat {
+  padding: $space-3;
+  border-radius: $radius-md;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.hero-stat__value {
+  display: block;
+  font-size: $font-size-xl;
+  font-weight: $font-weight-bold;
+}
+
+.hero-stat__label {
+  display: block;
+  margin-top: $space-1;
+  font-size: $font-size-xs;
+  opacity: 0.8;
+}
+
 .search-bar {
   display: flex;
   align-items: center;
   gap: $space-2;
-  margin: $space-4;
+  margin: $space-4 0;
   padding: $space-3 $space-4;
   background: $color-surface;
   border: 2rpx solid $color-border;
@@ -143,7 +322,6 @@ const tags = [
 .search-bar__icon {
   font-size: $font-size-lg;
   color: $color-text-muted;
-  flex-shrink: 0;
 }
 
 .search-bar__placeholder {
@@ -152,9 +330,39 @@ const tags = [
   flex: 1;
 }
 
-// ── Section ───────────────────────────────────────────────────────────────────
+.search-bar__cta {
+  color: $color-primary;
+  font-size: $font-size-sm;
+  font-weight: $font-weight-medium;
+}
+
+.login-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: $space-3;
+  margin-bottom: $space-4;
+}
+
+.login-banner__title {
+  display: block;
+  font-size: $font-size-base;
+  font-weight: $font-weight-bold;
+}
+
+.login-banner__desc {
+  display: block;
+  margin-top: $space-1;
+  color: $color-text-secondary;
+  font-size: $font-size-sm;
+}
+
+.login-banner__arrow {
+  font-size: $font-size-2xl;
+  color: $color-primary;
+}
+
 .section {
-  padding: 0 $space-4;
   margin-bottom: $space-5;
 }
 
@@ -165,20 +373,11 @@ const tags = [
   margin-bottom: $space-3;
 }
 
-.section__title {
-  display: block;
-  font-size: $font-size-lg;
-  font-weight: $font-weight-bold;
-  color: $color-text-primary;
-  margin-bottom: $space-3;
-}
-
 .section__more {
   font-size: $font-size-sm;
   color: $color-primary;
 }
 
-// ── Quick actions grid ────────────────────────────────────────────────────────
 .quick-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -192,17 +391,12 @@ const tags = [
   justify-content: center;
   padding: $space-3 $space-2;
   border-radius: $radius-md;
-  transition: opacity 0.1s;
-}
-
-.quick-card--hover {
-  opacity: 0.75;
+  min-height: 152rpx;
 }
 
 .quick-card__icon {
   font-size: 48rpx;
   margin-bottom: $space-2;
-  line-height: 1;
 }
 
 .quick-card__label {
@@ -212,41 +406,97 @@ const tags = [
   text-align: center;
 }
 
-// ── Notice list ───────────────────────────────────────────────────────────────
-.notice-list {
-  background: $color-surface;
+.category-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: $space-3;
+  margin-top: $space-3;
+}
+
+.category-card {
+  padding: $space-3;
   border-radius: $radius-md;
-  overflow: hidden;
+  background: $color-surface;
   box-shadow: $shadow-sm;
+}
+
+.category-card__name {
+  display: block;
+  font-size: $font-size-base;
+  font-weight: $font-weight-bold;
+}
+
+.category-card__meta {
+  display: block;
+  margin-top: $space-1;
+  font-size: $font-size-xs;
+  color: $color-text-muted;
+}
+
+.book-list {
+  display: flex;
+  flex-direction: column;
+  gap: $space-3;
+  margin-top: $space-3;
+}
+
+.book-card {
+  display: flex;
+  gap: $space-3;
+  align-items: stretch;
+}
+
+.book-card__cover {
+  width: 132rpx;
+  height: 176rpx;
+  border-radius: $radius-sm;
+  background: #d1fae5;
+  flex-shrink: 0;
+}
+
+.book-card__cover--placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: $color-primary-dark;
+  font-size: $font-size-sm;
+  font-weight: $font-weight-bold;
+}
+
+.book-card__body {
+  flex: 1;
+  min-width: 0;
+}
+
+.book-card__title {
+  display: block;
+  font-size: $font-size-base;
+  font-weight: $font-weight-bold;
+  color: $color-text-primary;
+}
+
+.book-card__author,
+.book-card__meta {
+  display: block;
+  margin-top: $space-2;
+  font-size: $font-size-sm;
+  color: $color-text-secondary;
+}
+
+.notice-list {
+  display: flex;
+  flex-direction: column;
+  gap: $space-3;
 }
 
 .notice-item {
   display: flex;
   align-items: center;
   gap: $space-3;
-  padding: $space-3 $space-4;
-  border-bottom: 2rpx solid $color-border;
-  transition: background 0.1s;
-
-  &:last-child {
-    border-bottom: none;
-  }
-}
-
-.notice-item--hover {
-  background: $color-bg;
-}
-
-.notice-item__dot {
-  width: 16rpx;
-  height: 16rpx;
-  border-radius: $radius-full;
-  flex-shrink: 0;
-
-  &--info    { background: $color-info; }
-  &--success { background: $color-success; }
-  &--warn    { background: $color-warning; }
-  &--error   { background: $color-error; }
+  padding: $space-3;
+  background: $color-surface;
+  border-radius: $radius-md;
+  box-shadow: $shadow-sm;
 }
 
 .notice-item__body {
@@ -258,39 +508,19 @@ const tags = [
   display: block;
   font-size: $font-size-base;
   color: $color-text-primary;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  font-weight: $font-weight-medium;
 }
 
 .notice-item__date {
   display: block;
-  margin-top: 4rpx;
+  margin-top: $space-1;
   font-size: $font-size-xs;
   color: $color-text-muted;
 }
 
-.notice-item__arrow {
-  color: $color-text-muted;
-  font-size: $font-size-xl;
-  flex-shrink: 0;
-}
-
-// ── Tags row ──────────────────────────────────────────────────────────────────
-.tags-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: $space-2;
-  padding: 0 $space-4;
-}
-
-.tag {
-  padding: $space-1 $space-3;
-  border-radius: $radius-full;
-}
-
-.tag__text {
-  font-size: $font-size-xs;
-  font-weight: $font-weight-medium;
+@media screen and (max-width: 360px) {
+  .quick-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }
 </style>

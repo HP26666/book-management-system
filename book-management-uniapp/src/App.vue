@@ -1,6 +1,10 @@
 <script>
+import { useUserStore } from './store/user'
+
 export default {
   onLaunch() {
+    const userStore = useUserStore()
+    userStore.bootstrap().catch(() => null)
     console.log('Book Management Uni-App launched')
   }
 }
@@ -21,7 +25,10 @@ page {
 
 view,
 text,
-image {
+image,
+button,
+input,
+scroll-view {
   box-sizing: border-box;
 }
 
@@ -48,5 +55,63 @@ image {
   background: $color-surface;
   border-radius: $radius-md;
   padding: $space-4;
+}
+
+.page-shell {
+  min-height: 100vh;
+  padding: $space-4;
+  background: $color-bg;
+}
+
+.section-title {
+  display: block;
+  font-size: $font-size-lg;
+  font-weight: $font-weight-bold;
+  color: $color-text-primary;
+}
+
+.section-subtitle {
+  display: block;
+  margin-top: $space-1;
+  color: $color-text-muted;
+  font-size: $font-size-sm;
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 104rpx;
+  padding: 8rpx 18rpx;
+  border-radius: $radius-full;
+  font-size: $font-size-xs;
+  font-weight: $font-weight-medium;
+
+  &--success {
+    background: #dcfce7;
+    color: $color-success;
+  }
+
+  &--danger {
+    background: #fee2e2;
+    color: $color-error;
+  }
+
+  &--warning,
+  &--pending {
+    background: #fef3c7;
+    color: $color-warning;
+  }
+
+  &--info,
+  &--primary {
+    background: #dbeafe;
+    color: $color-info;
+  }
+
+  &--muted {
+    background: #e2e8f0;
+    color: $color-text-muted;
+  }
 }
 </style>
