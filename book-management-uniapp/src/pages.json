@@ -3,20 +3,27 @@
     {
       "path": "pages/index/index",
       "style": {
-        "navigationBarTitleText": "图书管理系统"
+        "navigationBarTitleText": "图书管理系统",
+        "navigationBarBackgroundColor": "#0f766e",
+        "navigationBarTextStyle": "white",
+        "navigationStyle": "custom"
       }
     },
     {
       "path": "pages/profile/index",
       "style": {
-        "navigationBarTitleText": "我的"
+        "navigationBarTitleText": "我的",
+        "navigationBarBackgroundColor": "#0f766e",
+        "navigationBarTextStyle": "white",
+        "navigationStyle": "custom"
       }
     }
   ],
   "tabBar": {
-    "color": "#606266",
+    "color": "#64748b",
     "selectedColor": "#0f766e",
     "backgroundColor": "#ffffff",
+    "borderStyle": "white",
     "list": [
       {
         "pagePath": "pages/index/index",
@@ -27,5 +34,10 @@
         "text": "我的"
       }
     ]
+  },
+  "globalStyle": {
+    "navigationBarBackgroundColor": "#0f766e",
+    "navigationBarTextStyle": "white",
+    "backgroundColor": "#f6f8fb"
   }
 }
